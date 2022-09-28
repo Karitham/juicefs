@@ -133,7 +133,9 @@ def write_data(filesystem, path, data):
     # assert get_stage_blocks(filesystem) == 0
 
 def write_block(filesystem, filepath, bs, count):
-    run_cmd(f'dd if=/dev/urandom of={filepath} bs={bs} count={count}')
+    ret=run_cmd(f'dd if=/dev/urandom of={filepath} bs={bs} count={count}')
+    if ret != 0:
+        raise Exception(f"dd write data failed to {filepath}")
     retry = get_upload_delay_seconds(filesystem) + 10
     while get_stage_blocks(filesystem) != 0 and retry > 0:
         print('sleep for stage')
