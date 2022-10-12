@@ -47,9 +47,9 @@ jobs:
                     -v /tmp/config:/root/.minio \
                     minio/minio server /data     
           sleep 5
-          
-      - name: Build linux target
-        run: make juicefs
+
+      - name: Build 
+        uses: ./.github/actions/build
 
       - name: Download tool
         run: | 
@@ -58,6 +58,9 @@ jobs:
           
       - name: Test
         run: |
+          # # Consider command as failed when any component of the pipe fails:
+          # https://stackoverflow.com/questions/1221833/pipe-output-and-capture-exit-status-in-bash
+          set -o pipefail
           meta_url=redis://127.0.0.1/1
           mount_point=/tmp/sync-test/
           ./mc config host add minio http://127.0.0.1:9000 minioadmin minioadmin
@@ -86,8 +89,4 @@ jobs:
         uses: juicedata/slack-notify-action@main
         with:
           channel-id: "${{ secrets.SLACK_CHANNEL_ID_FOR_PR_CHECK_NOTIFY }}"
-          slack_bot_token: "${{ secrets.SLACK_BOT_TOKEN }}"  
-
-      - name: Setup upterm session
-        if: ${{ failure() }}
-        uses: lhotari/action-upterm@v1
+          slack_bot_token: "${{ secrets.SLACK_BOT_TOKEN }}"

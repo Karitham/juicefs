@@ -3,7 +3,6 @@ name: "integrationtests"
 on:
   push:
     branches:
-      - 'main'
       - 'release-*'
     paths-ignore:
       - 'docs/**'
@@ -16,29 +15,25 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**.md'
+      - '.github/**'
   workflow_dispatch:
 
 jobs:
   integrationtests:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: '1.17.x'
-
-      - name: Set up Docker
-        uses: docker-practice/actions-setup-docker@master
-
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 1
 
-      - name: Build linux target
-        run: |
-          make juicefs
+      - name: Build
+        uses: ./.github/actions/build
 
+      - name: Copy
+        run: |
+          cp juicefs /tmp/mount.juicefs
 
       - name: Run Redis
         run: |
@@ -81,9 +76,22 @@ jobs:
           sudo make -C fstests xattrs
           sudo make -C fstests flock
 
+
+      - name: Fsracer
+        #https://github.com/gfx/example-github-actions-with-tty
+        shell: 'script -q -e -c "bash {0}"'
+        run: |
+          sudo DURATION=60 make -C fstests fsracer
+
+      - name: MountJuiceFSTest
+        run: |
+          sudo /tmp/mount.juicefs redis://127.0.0.1:6379/1 /tmp/mount-jfs
+          [ `stat --format "%i" /tmp/mount-jfs` -eq 1 ]
+
+
       - name: log
         if: ${{ always() }}
-        run: | 
+        run: |
           tail -300 /var/log/juicefs.log
           grep "<FATAL>:" /var/log/juicefs.log && exit 1 || true
 
@@ -93,6 +101,7 @@ jobs:
         with:
           channel-id: "${{ secrets.SLACK_CHANNEL_ID_FOR_PR_CHECK_NOTIFY }}"
           slack_bot_token: "${{ secrets.SLACK_BOT_TOKEN }}"
+
 
       - name: Setup upterm session
         if: ${{ failure() }}
