@@ -49,6 +49,10 @@ jobs:
                     minio/minio server /data
           sleep 5
 
+      - name: Install tool
+        run: |
+          sudo pip install mysqlclient
+
       - name: Juicefs Format
         run: |
           sudo ./juicefs format --trash-days 0  --storage minio --bucket http://127.0.0.1:9000/mypics \
