@@ -88,35 +88,31 @@ jobs:
           if [ ${{matrix.workload}} == "varmail" ];then
             echo "run varmail workload"
             sudo sed -i "s?/tmp?/data/jfs?" varmail.f
-            sudo sed -i "s?run 60?run 1800?" varmail.f
+            sudo sed -i "s?run 60?run 600?" varmail.f
             cat varmail.f
-            start=`date +%s`
-            sudo filebench -f varmail.f
-            end=`date +%s`
+            sudo filebench -f varmail.f | tee result.log
           elif [ ${{matrix.workload}} == "webserver" ];then
             echo "run webserver workload"
             sudo sed -i "s?/tmp?/data/jfs?" webserver.f
-            sudo sed -i "s?run 60?run 1800?" webserver.f
+            sudo sed -i "s?run 60?run 600?" webserver.f
             cat webserver.f
-            start=`date +%s`
-            sudo filebench -f webserver.f
-            end=`date +%s`
+            sudo filebench -f webserver.f | tee result.log
           elif [ ${{matrix.workload}} == "videoserver" ];then
             echo "run videoserver worload"
             sudo sed -i "s?/tmp?/data/jfs?" videoserver.f
             sudo sed -i "s?$filesize=10g?$filesize=100m?" videoserver.f
             sudo sed -i "s?$numpassivevids=194?$numpassivevids=100?" videoserver.f
-            sudo echo "run 1800" >>videoserver.f
+            sudo echo "run 600" >>videoserver.f
             cat videoserver.f
-            start=`date +%s`
-            sudo filebench -f videoserver.f
-            end=`date +%s`
+            sudo filebench -f videoserver.f | tee result.log
           fi
+          ops=$(grep "IO Summary" result.log | awk -F" " '{print $6}')
+          bandwidth=$(grep "IO Summary" result.log | awk -F" " '{print $10}'|rev | cut -c5- | rev)
           runtime=$((end-start))
           export MYSQL_PASSWORD=${{secrets.MYSQL_PASSWORD_FOR_JUICEDATA}} 
           sudo chmod +x .github/scripts/db.py
           version=$(./juicefs -V|cut -b 17- | sed 's/:/-/g')
-          python3 .github/scripts/db.py --name filebench_${{matrix.workload}} --result $runtime --version $version --meta redis --storage minio
+          python3 .github/scripts/db.py --name filebench_${{matrix.workload}} --result $bandwidth --version $version --meta redis --storage minio --extra $ops
 
       - name: Log
         if: ${{ always() }}
