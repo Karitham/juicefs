@@ -148,7 +148,7 @@ runs:
           fi
           meta=`echo ${{inputs.meta_url}} | awk -F: '{print $1}'`
           
-          export MYSQL_PASSWORD=${{secrets.MYSQL_PASSWORD_FOR_JUICEDATA}} 
+          export MYSQL_PASSWORD=${{inputs.mysql_password}}
           sudo chmod +x .github/scripts/db.py
           python3 .github/scripts/db.py --name fio_$name --result $bw --version $juicefs_version --meta $meta --storage ${{inputs.storage}}
 
