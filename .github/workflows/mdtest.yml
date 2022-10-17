@@ -32,19 +32,6 @@ jobs:
         meta: ['postgres']
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -64,6 +51,15 @@ jobs:
         uses: ./.github/actions/build
         with: 
           target: ${{steps.vars.outputs.target}}
+
+      - name: Start postgres
+        run: 
+          docker run --name postgresql \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -p 5432:5432 \
+            -v /tmp/data:/var/lib/postgresql/data \
+            -d postgres
 
       - name: Start minio
         run: | 
@@ -106,3 +102,5 @@ jobs:
         with:
           channel-id: "${{ secrets.SLACK_CHANNEL_ID_FOR_PR_CHECK_NOTIFY }}"
           slack_bot_token: "${{ secrets.SLACK_BOT_TOKEN }}"  
+
+
