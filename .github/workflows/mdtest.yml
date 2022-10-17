@@ -10,7 +10,7 @@ on:
       depth:
         description: 'depth of directory'
         required: true
-        default: 10
+        default: 3
       files:
         description: 'number of files for each directory'
         required: true
@@ -95,7 +95,7 @@ jobs:
 
           ./juicefs format --help | grep "trash-days" && trash_day="--trash-days 0" || trash_day=""
           ./juicefs --help | grep "pyroscope" && pyroscope="--pyroscope http://172.27.0.1:4040" || pyroscope=""
-          ./juicefs format $trash_day --storage minio --bucket  http://localhost:9000/mdtest --access-key minioadmin --secret-key ${{ secrets.MINIO_SECRET_KEY }}  $meta_url mdtest
+          ./juicefs format $trash_day --storage minio --bucket  http://localhost:9000/ --access-key minioadmin --secret-key minioadmin  $meta_url mdtest
           ./juicefs mount -d $meta_url /tmp/mdtest --no-usage-report $pyroscope 
           ./juicefs mdtest $meta_url test --dirs $dirs --depth $depth --files $files --threads $threads --write $bytes
           find /tmp/mdtest -name abc
