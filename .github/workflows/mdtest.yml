@@ -25,7 +25,26 @@ on:
         default: 0
 jobs:
   mdtest:
-    runs-on: [self-hosted, daily-build, bench-02]
+    strategy:
+      fail-fast: false
+      matrix:
+        # meta: [ 'sqlite3', 'redis', 'mysql', 'tikv', 'tidb', 'postgres', 'mariadb', 'badger', 'fdb']
+        meta: ['postgres']
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -35,30 +54,39 @@ jobs:
       - name: Set Variable
         id: vars
         run: |
-          echo ::set-output name=META_URL::redis://mymaster,172.27.0.1,172.27.0.2,172.27.0.3:26379/7
-          echo ::set-output name=MOUNT_POINT::/tmp/mdtest
-          echo ::set-output name=BACKWARD_VERSIONS::1
-          echo ::set-output name=PYROSCOPE_URL::http://172.27.0.1:4040
+          if [ "${{matrix.meta}}" == "fdb" ]; then
+            echo ::set-output name=target::"juicefs.fdb"
+          else
+            echo ::set-output name=target::"juicefs"
+          fi
 
       - name: Build
         uses: ./.github/actions/build
+        with: 
+          target: ${{steps.vars.outputs.target}}
 
-      - name: Clean Before
-        run: |
-          rm /var/jfsCache/ -rf
-          if [ -d ${{ steps.vars.outputs.MOUNT_POINT }} ]; then
-            ./juicefs umount ${{ steps.vars.outputs.MOUNT_POINT }} || true
-          fi
-          UUID=$(./juicefs status ${{ steps.vars.outputs.META_URL }} | grep UUID | cut -d '"' -f 4)
-          if [ -n "$UUID" ];then
-            sudo ./juicefs destroy --force ${{ steps.vars.outputs.META_URL }} $UUID
-          fi
+      - name: Start minio
+        run: | 
+          docker run -d -p 9000:9000 --name minio \
+                        -e "MINIO_ACCESS_KEY=minioadmin" \
+                        -e "MINIO_SECRET_KEY=minioadmin" \
+                        -v /tmp/data:/data \
+                        -v /tmp/config:/root/.minio \
+                        minio/minio server /data
 
-      - name: Fio Benchmark 
+      - name: Prepare meta db
+        run: | 
+          chmod +x .github/scripts/start_meta_engine.sh
+          source .github/scripts/start_meta_engine.sh
+          start_meta_engine ${{matrix.meta}}
+          meta_url=$(get_meta_url ${{matrix.meta}})
+          create_database $meta_url
+
+      - name: Mdtest 
         run: |
-          export PYROSCOPE_AUTH_TOKEN="${{ secrets.PYROSCOPE_AUTH_TOKEN }}"  
-          meta_url=${{ steps.vars.outputs.META_URL }}
-          minio_url=http://172.27.0.2:9005/mdtest
+          source .github/scripts/start_meta_engine.sh
+          meta_url=$(get_meta_url ${{matrix.meta}})
+          export PYROSCOPE_AUTH_TOKEN="http://172.27.0.1:4040"  
           dirs=${{ github.event.inputs.dirs }}
           depth=${{ github.event.inputs.depth }}
           files=${{ github.event.inputs.files }}
@@ -66,21 +94,11 @@ jobs:
           threads=${{ github.event.inputs.threads }}
 
           ./juicefs format --help | grep "trash-days" && trash_day="--trash-days 0" || trash_day=""
-          ./juicefs --help | grep "pyroscope" && pyroscope="--pyroscope ${{steps.vars.outputs.PYROSCOPE_URL}}" || pyroscope=""
-          ./juicefs format $trash_day --storage minio --bucket  $minio_url --access-key minioadmin --secret-key ${{ secrets.MINIO_SECRET_KEY }}  $meta_url mdtest
-          ./juicefs mount -d $meta_url ${{ steps.vars.outputs.MOUNT_POINT }} --no-usage-report $pyroscope 
+          ./juicefs --help | grep "pyroscope" && pyroscope="--pyroscope http://172.27.0.1:4040" || pyroscope=""
+          ./juicefs format $trash_day --storage minio --bucket  http://localhost:9000/mdtest --access-key minioadmin --secret-key ${{ secrets.MINIO_SECRET_KEY }}  $meta_url mdtest
+          ./juicefs mount -d $meta_url /tmp/mdtest --no-usage-report $pyroscope 
           ./juicefs mdtest $meta_url test --dirs $dirs --depth $depth --files $files --threads $threads --write $bytes
-
-      - name: Clean After
-        if: ${{always()}}
-        run: |
-          if [ -d ${{ steps.vars.outputs.MOUNT_POINT }} ]; then
-            ./juicefs umount ${{ steps.vars.outputs.MOUNT_POINT }} || true
-          fi
-          UUID=$(./juicefs status ${{ steps.vars.outputs.META_URL }} | grep UUID | cut -d '"' -f 4)
-          if [ -n "$UUID" ];then
-            sudo ./juicefs destroy --force ${{ steps.vars.outputs.META_URL }} $UUID
-          fi
+          find /tmp/mdtest -name abc
 
       - name: Send Slack Notification
         if: ${{ failure() }}
