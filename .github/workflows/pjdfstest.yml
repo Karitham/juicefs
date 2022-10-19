@@ -32,7 +32,8 @@ jobs:
           if [ "${{github.event_name}}" == "schedule"  ]; then
             echo '::set-output name=meta_matrix::["sqlite3", "redis", "mysql", "tikv", "tidb", "postgres", "badger", "mariadb", "fdb"]'
           else
-            echo '::set-output name=meta_matrix::["redis"]'
+            # echo '::set-output name=meta_matrix::["redis"]'
+            echo '::set-output name=meta_matrix::["tikv"]'
             # echo '::set-output name=meta_matrix::["sqlite3", "redis", "mysql", "tikv", "tidb", "postgres", "badger", "mariadb", "fdb"]'
           fi
     outputs:
@@ -71,13 +72,13 @@ jobs:
         with: 
           target: ${{steps.vars.outputs.target}}
 
-      - uses: actions/cache@v3
-        if: ${{ matrix.meta == 'tikv' || matrix.meta == 'tidb' }}
-        with:
-          path: ~/.tiup
-          key: ${{ runner.os }}-tiup
-          restore-keys: |
-            ${{ runner.os }}-tiup
+      # - uses: actions/cache@v3
+      #   if: ${{ matrix.meta == 'tikv' || matrix.meta == 'tidb' }}
+      #   with:
+      #     path: ~/.tiup
+      #     key: ${{ runner.os }}-tiup
+      #     restore-keys: |
+      #       ${{ runner.os }}-tiup
 
       - name: Prepare meta db
         run: | 
@@ -140,5 +141,5 @@ jobs:
 
       - name: Setup upterm session
         if: ${{ failure() }}
-        timeout-minutes: 1
+        timeout-minutes: 20
         uses: lhotari/action-upterm@v1
