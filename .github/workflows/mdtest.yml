@@ -90,7 +90,7 @@ jobs:
         run: |
           source .github/scripts/start_meta_engine.sh
           meta_url=$(get_meta_url ${{matrix.meta}})
-          sudo ./juicefs format $meta_url --trash-days 0 pics
+          ./juicefs format $meta_url --trash-days 0 pics
 
       - name: Juicefs Mount
         run: |
@@ -98,16 +98,20 @@ jobs:
           meta_url=$(get_meta_url ${{matrix.meta}})
           # sudo mkdir /var/jfs
           # sudo chmod 777 /var/jfs
-          sudo ./juicefs mount -d $meta_url /tmp/jfs --no-usage-report &
-          sleep 5
+          for i in {1..100}; do
+            ./juicefs mount -d $meta_url /tmp/jfs$i --no-usage-report &
+          done
+          sleep 10
           if [ ! -f /tmp/jfs/.accesslog ]; then
             echo "<FATAL>: mount failed"
             exit 1
           fi
 
-      - name: Pjdfstest
+      - name: Test mkdir
         run: |
-          exit 0
+          for i in {1..100}; do
+            mkdir /tmp/jfs$i/abc &
+          done
 
       - name: log
         if: ${{ always() }}
