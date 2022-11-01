@@ -99,13 +99,15 @@ jobs:
           # sudo mkdir /var/jfs
           # sudo chmod 777 /var/jfs
           for i in {1..100}; do
-            ./juicefs mount -d $meta_url /tmp/jfs$i --no-usage-report &
+            ./juicefs mount -d $meta_url /tmp/jfs$i --no-usage-report 
           done
-          sleep 10
-          if [ ! -f /tmp/jfs/.accesslog ]; then
-            echo "<FATAL>: mount failed"
-            exit 1
-          fi
+          sleep 60
+          for i in {1..100}; do
+            if [ ! -f /tmp/jfs$i/.accesslog ]; then
+              echo "<FATAL>: mount failed"
+              exit 1
+            fi
+          done
 
       - name: Test mkdir
         run: |
