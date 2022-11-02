@@ -1,4 +1,4 @@
-name: "mdtest"
+name: "multiclienttest"
 
 on:
   push:
@@ -39,14 +39,14 @@ jobs:
           elif [ "${{github.event_name}}" == "pull_request"  ]; then
             echo '::set-output name=meta_matrix::["redis"]'
           elif [ "${{github.event_name}}" == "workflow_dispatch"  ]; then
-            echo '::set-output name=meta_matrix::["redis"]'
+            echo '::set-output name=meta_matrix::["tikv", "tidb"]'
           else
             echo '::set-output name=meta_matrix::["redis"]'
           fi
     outputs:
       meta_matrix: ${{ steps.set-matrix.outputs.meta_matrix }}
 
-  mdtest:
+  multiclient:
     needs: build-matrix
     strategy:
       fail-fast: false
@@ -90,7 +90,7 @@ jobs:
         run: |
           source .github/scripts/start_meta_engine.sh
           meta_url=$(get_meta_url ${{matrix.meta}})
-          ./juicefs format $meta_url --trash-days 0 pics
+          sudo ./juicefs format $meta_url --trash-days 0 pics
 
       - name: Juicefs Mount
         run: |
@@ -98,22 +98,24 @@ jobs:
           meta_url=$(get_meta_url ${{matrix.meta}})
           # sudo mkdir /var/jfs
           # sudo chmod 777 /var/jfs
-          for i in {1..100}; do
-            ./juicefs mount -d $meta_url /tmp/jfs$i --no-usage-report 
-          done
-          sleep 60
-          for i in {1..100}; do
-            if [ ! -f /tmp/jfs$i/.accesslog ]; then
-              echo "<FATAL>: mount failed"
-              exit 1
-            fi
-          done
+          sudo ./juicefs mount -d $meta_url /tmp/jfs --no-usage-report &
+          sleep 5
+          if [ ! -f /tmp/jfs/.accesslog ]; then
+            echo "<FATAL>: mount failed"
+            exit 1
+          fi
 
-      - name: Test mkdir
+      - name: Pjdfstest
         run: |
-          for i in {1..100}; do
-            mkdir /tmp/jfs$i/abc || true & 
-          done
+          sudo apt-get update
+          sudo apt-get install -y libtap-harness-archive-perl
+          cd /tmp/jfs/
+          git clone https://github.com/sanwan/pjdfstest.git
+          cd pjdfstest
+          autoreconf -ifs
+          ./configure
+          make pjdfstest
+          sudo prove -rv tests/
 
       - name: log
         if: ${{ always() }}
