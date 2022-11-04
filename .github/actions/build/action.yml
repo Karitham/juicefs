@@ -20,6 +20,7 @@ runs:
         sudo ln -s /opt/hostedtoolcache/go/1.18.7/x64/bin/go /usr/bin/go
         go version
         sudo go version
+        exit 1
 
     - uses: actions/cache@v3
       with:
