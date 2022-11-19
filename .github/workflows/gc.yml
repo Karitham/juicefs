@@ -43,6 +43,7 @@ jobs:
         run: | 
           sudo apt install redis-tools
           sudo apt install fio
+          exit 1
           
       - name: Test delay delete slice after compaction
         run: |
