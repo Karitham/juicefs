@@ -13,6 +13,11 @@ on:
         description: "the go test file relative path you want to mutate, eg cmd/meta/xattr_test.go"
         required: true
         default: ""  
+      enable_mutators:
+        type: string
+        description: "the mutators enabled"
+        required: true
+        default: "branch/case,branch/else,branch/if,expression/comparison,expression/remove,statement/remove"  
       debug:
         type: boolean
         description: "Run the build with tmate debugging enabled"
@@ -175,8 +180,10 @@ jobs:
             exit 0
           fi
           
+          disable_mutator_options=$(ENABLE_MUTATORS=${{github.event.inputs.enable_mutators}} python3 .github/scripts/parse_disable_mutators.py)
+          echo "disable_mutator_options=$disable_mutator_options"
           log_file=$(basename ${{matrix.test_file}}).log
-          COVERAGE_FILE=mutest-cov.out TEST_FILE_NAME="$test_file" PACKAGE_PATH="$package_path" go-mutesting $source_file --debug --exec=.github/scripts/mutest.sh  --do-not-remove-tmp-folder | tee -a $log_file
+          COVERAGE_FILE=mutest-cov.out TEST_FILE_NAME="$test_file" PACKAGE_PATH="$package_path" go-mutesting $source_file --debug --exec=.github/scripts/mutest.sh  --do-not-remove-tmp-folder $disable_mutator_options | tee -a $log_file
           mutate_report=`LOG_FILE=$log_file python3 .github/scripts/parse_mutate_log.py`
           echo "mutate_report is $mutate_report"
           echo "mutate_report=$mutate_report" >> $GITHUB_ENV
